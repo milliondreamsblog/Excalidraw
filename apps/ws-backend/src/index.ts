@@ -1,0 +1,36 @@
+import { WebSocketServer } from "ws";
+import JWT_SECRET from "./config";
+import jwt, { JwtPayload } from "jsonwebtoken"
+
+const wss = new WebSocketServer({ port: 8080 });
+
+//stoping it at http level as well ?
+
+
+wss.on('connection', function connection(ws , request) {
+  const url = request.url;
+  if(!url){
+    return;
+  }
+
+  const queryParams = new URLSearchParams(url.split("?")[1]);
+  const token = queryParams.get("tokens") || "";
+  const decoded = jwt.verify(token , JWT_SECRET);
+
+  // if(typeof decoded == "string"){
+  //   ws.close();
+  //   return
+  // }
+
+  if(!decoded || !(decoded as JwtPayload).userId ){
+    ws.close()
+    return;
+  }
+  ws.on('error', console.error);
+
+  ws.on('message', function message(data) {
+    console.log('received: %s', data);
+  });
+
+  ws.send('something');
+});
