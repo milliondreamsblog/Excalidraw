@@ -3,84 +3,103 @@ import jwt  from "jsonwebtoken";
 import {JWT_SECRET} from "@repo/backend-common/config"
 import {signUpSchema} from "@repo/common/types"
 import {signInSchema} from "@repo/common/types"
+import {prismaClient} from "@repo/backend-database/db"
 const app = express();
 const router = express.Router()
 
-router.post("/signUp" , async (req,res)=>{
-    const parsed = signUpSchema.safeParse(req.body);
-    if(!parsed.success){
-        res.status(411).json({
-            message : "inviald input"
-        })
-    }
+router.post("/signUp", async (req, res) => {
+  const parsed = signUpSchema.safeParse(req.body);
 
-    const existingUser = await userModel.findOne({
-        username : req.body.username
-    })
+  if (!parsed.success) {
+    return res.status(411).json({
+      message: "Invalid input",
+    });
+  }
 
-    if(existingUser){
-        return res.status(411).json({
-            message : "Username already exist"
-        })
-    }
+  const { name, email, password, photo } = parsed.data;
 
-    const user = await userModel.create(
-        {
-            username : req.body.username,
-            firstname :  req.body.firstname,
-            email : req.body.email
-        }
-    )
+  const existingUser = await prismaClient.user.findUnique({
+    where: { name },
+  });
 
-    const token = jwt.sign({
-        user
-    },JWT_SECRET)
+  if (existingUser) {
+    return res.status(411).json({
+      message: "Username already exists",
+    });
+  }
 
-    res.json({
-        message : "New user signIn has happened",
-        token :  token
-    })
+  const user = await prismaClient.user.create({
+    data: {
+      name,
+      email,
+      password,
+      photo,
+    },
+  });
 
-})
+  const token = jwt.sign(
+    {
+      userId: user.id,
+      name: user.name,
+    },
+    process.env.JWT_SECRET!,
+    { expiresIn: "1h" }
+  );
+
+  return res.json({
+    message: "New user signup successful",
+    token,
+  });
+});
+
 
 // const signInSchema = z.object({
 //     username : z.string,
 //     password : z.string
 // })
-router.post("/signIn" , async (req ,res)=>{
+router.post("/signIn", async (req, res) => {
+  const parsed = signInSchema.safeParse(req.body);
 
-    const parsed = signInSchema.safeParse(req.body);
-    if(!parsed.success){
-        return res.status(411).json({
-            message: "Invaild credential"
-        })
-    }
+  if (!parsed.success) {
+    return res.status(411).json({
+      message: "Invalid credentials",
+    });
+  }
 
-    const findUser = await userModel.find({
-        username
-    })
+  const { name, password } = parsed.data;
 
-    if(!username){
-        return res.status(411).json({
-            message : "user dose'nt exits"
-        })
-    }
+  const user = await prismaClient.user.findUnique({
+    where: { name },
+  });
 
-    let token;
-    if(user.password === password) {
-        const token = jwt.sign({
-            userId : user._id , username : req.username
-        })
+  if (!user) {
+    return res.status(411).json({
+      message: "User doesn't exist",
+    });
+  }
 
-    }else{
-        res.status(411).json({
-            message : "invaild Credential"
-        })
-    }
+  let token;
 
+  if (user.password === password) {
+    token = jwt.sign(
+      {
+        userId: user.id,
+        name: user.name,
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1h" }
+    );
+  } else {
+    return res.status(411).json({
+      message: "Invalid credentials",
+    });
+  }
 
+  return res.json({
+    token,
+  });
+});
 
-} )
 
 router.post("/create-room" , async (req ,res)=>{
     //db call
