@@ -11,11 +11,11 @@ export const signUpSchema = z.object({
 })
 
 export const signInSchema = z.object({
-    username : z.string,
-    password : z.string
+    name : z.string(),
+    password : z.string()
 })
 
 export const createRoom = z.object({
-    username : z.string,
-    password : z.string
+    name : z.string(),
+    password : z.string()
 })

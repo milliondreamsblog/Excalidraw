@@ -1,9 +1,10 @@
 import express from "express"
 import jwt  from "jsonwebtoken";
 import {JWT_SECRET} from "@repo/backend-common/config"
-import {signUpSchema} from "@repo/common/types"
+import {createRoom, signUpSchema} from "@repo/common/types"
 import {signInSchema} from "@repo/common/types"
 import {prismaClient} from "@repo/backend-database/db"
+import { authMiddleware } from "../src/middleware";
 const app = express();
 const router = express.Router()
 
@@ -18,7 +19,7 @@ router.post("/signUp", async (req, res) => {
 
   const { name, email, password, photo } = parsed.data;
 
-  const existingUser = await prismaClient.user.findUnique({
+  const existingUser = await prismaClient.user.findMany({
     where: { name },
   });
 
@@ -68,7 +69,7 @@ router.post("/signIn", async (req, res) => {
 
   const { name, password } = parsed.data;
 
-  const user = await prismaClient.user.findUnique({
+  const user = await prismaClient.user.findMany({
     where: { name },
   });
 
@@ -101,10 +102,30 @@ router.post("/signIn", async (req, res) => {
 });
 
 
-router.post("/create-room" , async (req ,res)=>{
+router.post("/create-room" , authMiddleware  , async (req ,res)=>{
     //db call
+    const parsed = createRoom.safeParse(req.body);
+
+    if(!parsed.success){
+      res.status(411).json({
+        message : "Invild roomID"
+      })
+    }
+
+    const { name, password } = parsed.data; 
+    
+    const userId = req.userId;
+
+    await prismaClient.room.create({
+      data: {
+        slug : name,
+        adminId : userId
+      }
+    })
 
     res.json({
         roomId : 123
     })
 } )
+
+export default router;
